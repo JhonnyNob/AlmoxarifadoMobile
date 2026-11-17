@@ -21,182 +21,352 @@ const banco = mysql.createPool({
 });
 
 app.get("/", (req, res) => {
-  res.json({
-    mensagem: "API do Almoxarifado funcionando!",
-  });
+  res.json({ mensagem: "API do Almoxarifado funcionando!" });
 });
 
 app.post("/usuarios", async (req, res) => {
-  const { nome_usuario, senha } = req.body;
-
-  if (!nome_usuario || !senha) {
-    return res.status(400).json({
-      mensagem: "Informe o nome de usuário e a senha.",
-    });
-  }
-
   try {
-    const hash = await bcrypt.hash(senha, 10);
+    const { nome_usuario, senha } = req.body;
 
-    await banco.execute(
-      "INSERT INTO usuarios (nome_usuario, senha) VALUES (?, ?)",
-      [nome_usuario, hash],
-    );
-
-    return res.status(201).json({
-      mensagem: "Usuário cadastrado com sucesso!",
-    });
-  } catch (erro) {
-    if (erro.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({
-        mensagem: "Esse nome de usuário já está em uso.",
+    if (!nome_usuario || !senha) {
+      return res.status(400).json({
+        mensagem: "Nome de usuário e senha são obrigatórios.",
       });
     }
 
+    const [usuarioExistente] = await banco.execute(
+      "SELECT id FROM usuarios WHERE nome_usuario = ?",
+      [nome_usuario],
+    );
+
+    if (usuarioExistente.length > 0) {
+      return res.status(409).json({
+        mensagem: "Esse nome de usuário já existe.",
+      });
+    }
+
+    const senhaHash = await bcrypt.hash(senha, 10);
+
+    const [resultado] = await banco.execute(
+      "INSERT INTO usuarios (nome_usuario, senha) VALUES (?, ?)",
+      [nome_usuario, senhaHash],
+    );
+
+    res.status(201).json({
+      mensagem: "Usuário cadastrado com sucesso.",
+      usuario: {
+        id: resultado.insertId,
+        nome_usuario,
+      },
+    });
+  } catch (erro) {
     console.error(erro);
 
-    return res.status(500).json({
+    res.status(500).json({
       mensagem: "Erro ao cadastrar usuário.",
     });
   }
 });
 
 app.post("/login", async (req, res) => {
-  const { nome_usuario, senha } = req.body;
-
-  if (!nome_usuario || !senha) {
-    return res.status(400).json({
-      mensagem: "Informe o nome de usuário e a senha.",
-    });
-  }
-
   try {
+    const { nome_usuario, senha } = req.body;
+
+    if (!nome_usuario || !senha) {
+      return res.status(400).json({
+        mensagem: "Nome de usuário e senha são obrigatórios.",
+      });
+    }
+
     const [usuarios] = await banco.execute(
       "SELECT id, nome_usuario, senha FROM usuarios WHERE nome_usuario = ?",
       [nome_usuario],
     );
 
-    if (
-      usuarios.length === 0 ||
-      !(await bcrypt.compare(senha, usuarios[0].senha))
-    ) {
+    if (usuarios.length === 0) {
       return res.status(401).json({
-        mensagem: "Nome de usuário ou senha inválidos.",
+        mensagem: "Usuário ou senha incorretos.",
       });
     }
 
-    return res.json({
-      mensagem: "Login realizado com sucesso!",
+    const usuario = usuarios[0];
+
+    const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
+
+    if (!senhaCorreta) {
+      return res.status(401).json({
+        mensagem: "Usuário ou senha incorretos.",
+      });
+    }
+
+    res.json({
+      mensagem: "Login realizado com sucesso.",
       usuario: {
-        id: usuarios[0].id,
-        nome_usuario: usuarios[0].nome_usuario,
+        id: usuario.id,
+        nome_usuario: usuario.nome_usuario,
       },
     });
   } catch (erro) {
     console.error(erro);
 
-    return res.status(500).json({
+    res.status(500).json({
       mensagem: "Erro ao realizar login.",
     });
   }
 });
 
 app.get("/itens", async (req, res) => {
-  const { usuario_id } = req.query;
-
-  if (!usuario_id) {
-    return res.status(400).json({
-      mensagem: "O ID do usuário é obrigatório.",
-    });
-  }
-
   try {
+    const { usuario_id } = req.query;
+
+    if (!usuario_id) {
+      return res.status(400).json({
+        mensagem: "usuario_id é obrigatório.",
+      });
+    }
+
     const [itens] = await banco.execute(
-      "SELECT id, nome, quantidade FROM itens WHERE usuario_id = ? ORDER BY nome",
+      `SELECT id, nome, quantidade
+       FROM itens
+       WHERE usuario_id = ?
+       ORDER BY nome`,
       [usuario_id],
     );
 
-    return res.json(itens);
+    res.json(itens);
   } catch (erro) {
-    console.error("Erro ao buscar itens:", erro);
+    console.error(erro);
 
-    return res.status(500).json({
+    res.status(500).json({
       mensagem: "Erro ao buscar itens.",
     });
   }
 });
 
 app.post("/itens", async (req, res) => {
-  const { usuario_id, nome, quantidade } = req.body;
-
-  if (
-    !usuario_id ||
-    typeof nome !== "string" ||
-    !nome.trim() ||
-    quantidade === undefined ||
-    quantidade === null ||
-    quantidade === ""
-  ) {
-    return res.status(400).json({
-      mensagem: "Informe o usuário, o nome e a quantidade do item.",
-    });
-  }
-
-  const quantidadeNumero = Number(quantidade);
-
-  if (!Number.isSafeInteger(quantidadeNumero) || quantidadeNumero < 0) {
-    return res.status(400).json({
-      mensagem: "A quantidade deve ser um número inteiro não negativo.",
-    });
-  }
-
   try {
+    const { usuario_id, nome, quantidade } = req.body;
+
+    if (!usuario_id || !nome || quantidade === undefined) {
+      return res.status(400).json({
+        mensagem: "Usuário, nome e quantidade são obrigatórios.",
+      });
+    }
+
+    const quantidadeNumerica = Number(quantidade);
+
+    if (!Number.isInteger(quantidadeNumerica) || quantidadeNumerica < 0) {
+      return res.status(400).json({
+        mensagem:
+          "A quantidade deve ser um número inteiro maior ou igual a zero.",
+      });
+    }
+
     const nomeLimpo = nome.trim();
 
-    const [resultado] = await banco.execute(
-      `
-            INSERT INTO itens (usuario_id, nome, quantidade)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE quantidade = quantidade + ?
-            `,
-      [usuario_id, nomeLimpo, quantidadeNumero, quantidadeNumero],
+    if (!nomeLimpo) {
+      return res.status(400).json({
+        mensagem: "O nome do item é obrigatório.",
+      });
+    }
+
+    await banco.execute(
+      `INSERT INTO itens (usuario_id, nome, quantidade)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE quantidade = quantidade + ?`,
+      [usuario_id, nomeLimpo, quantidadeNumerica, quantidadeNumerica],
     );
 
     const [itens] = await banco.execute(
-      `
-            SELECT id, nome, quantidade
-            FROM itens
-            WHERE usuario_id = ? AND nome = ?
-            `,
+      `SELECT id, nome, quantidade
+       FROM itens
+       WHERE usuario_id = ? AND nome = ?`,
       [usuario_id, nomeLimpo],
     );
 
-    return res.status(201).json({
-      mensagem:
-        resultado.affectedRows === 1
-          ? "Item cadastrado com sucesso!"
-          : "Quantidade adicionada ao item existente!",
+    res.status(201).json({
+      mensagem: "Item adicionado com sucesso.",
       item: itens[0],
     });
   } catch (erro) {
-    console.error("Erro ao cadastrar item:", erro);
+    console.error(erro);
 
-    return res.status(500).json({
-      mensagem: "Erro ao cadastrar item.",
+    res.status(500).json({
+      mensagem: "Erro ao adicionar item.",
     });
   }
 });
 
-app.listen(PORT, "0.0.0.0", async () => {
-  console.log(`API rodando na porta ${PORT}`);
-
+app.put("/itens/:id", async (req, res) => {
   try {
-    const conexao = await banco.getConnection();
+    const { id } = req.params;
+    const { usuario_id, nome, quantidade } = req.body;
 
-    console.log("Conexão com MySQL estabelecida!");
+    if (!usuario_id || !nome || quantidade === undefined) {
+      return res.status(400).json({
+        mensagem: "Usuário, nome e quantidade são obrigatórios.",
+      });
+    }
 
-    conexao.release();
+    const quantidadeNumerica = Number(quantidade);
+
+    if (!Number.isInteger(quantidadeNumerica) || quantidadeNumerica < 0) {
+      return res.status(400).json({
+        mensagem:
+          "A quantidade deve ser um número inteiro maior ou igual a zero.",
+      });
+    }
+
+    const nomeLimpo = nome.trim();
+
+    if (!nomeLimpo) {
+      return res.status(400).json({
+        mensagem: "O nome do item é obrigatório.",
+      });
+    }
+
+    const [resultado] = await banco.execute(
+      `UPDATE itens
+       SET nome = ?, quantidade = ?
+       WHERE id = ? AND usuario_id = ?`,
+      [nomeLimpo, quantidadeNumerica, id, usuario_id],
+    );
+
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({
+        mensagem: "Item não encontrado.",
+      });
+    }
+
+    const [itens] = await banco.execute(
+      `SELECT id, nome, quantidade
+       FROM itens
+       WHERE id = ? AND usuario_id = ?`,
+      [id, usuario_id],
+    );
+
+    res.json({
+      mensagem: "Item atualizado com sucesso.",
+      item: itens[0],
+    });
   } catch (erro) {
-    console.error("Erro ao conectar ao MySQL:", erro.message);
+    if (erro.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        mensagem: "Já existe um item com esse nome.",
+      });
+    }
+
+    console.error(erro);
+
+    res.status(500).json({
+      mensagem: "Erro ao editar item.",
+    });
   }
+});
+
+app.post("/itens/:id/saida", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { usuario_id, quantidade } = req.body;
+
+    if (!usuario_id || quantidade === undefined) {
+      return res.status(400).json({
+        mensagem: "Usuário e quantidade são obrigatórios.",
+      });
+    }
+
+    const quantidadeNumerica = Number(quantidade);
+
+    if (!Number.isInteger(quantidadeNumerica) || quantidadeNumerica <= 0) {
+      return res.status(400).json({
+        mensagem:
+          "A quantidade de saída deve ser um número inteiro maior que zero.",
+      });
+    }
+
+    const [itens] = await banco.execute(
+      `SELECT id, nome, quantidade
+       FROM itens
+       WHERE id = ? AND usuario_id = ?`,
+      [id, usuario_id],
+    );
+
+    if (itens.length === 0) {
+      return res.status(404).json({
+        mensagem: "Item não encontrado.",
+      });
+    }
+
+    const item = itens[0];
+
+    if (quantidadeNumerica > item.quantidade) {
+      return res.status(400).json({
+        mensagem: `Não é possível retirar ${quantidadeNumerica} unidade(s). O estoque possui apenas ${item.quantidade}.`,
+      });
+    }
+
+    await banco.execute(
+      `UPDATE itens
+       SET quantidade = quantidade - ?
+       WHERE id = ? AND usuario_id = ?`,
+      [quantidadeNumerica, id, usuario_id],
+    );
+
+    const [itemAtualizado] = await banco.execute(
+      `SELECT id, nome, quantidade
+       FROM itens
+       WHERE id = ? AND usuario_id = ?`,
+      [id, usuario_id],
+    );
+
+    res.json({
+      mensagem: "Saída registrada com sucesso.",
+      item: itemAtualizado[0],
+    });
+  } catch (erro) {
+    console.error(erro);
+
+    res.status(500).json({
+      mensagem: "Erro ao registrar saída.",
+    });
+  }
+});
+
+app.delete("/itens/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { usuario_id } = req.query;
+
+    if (!usuario_id) {
+      return res.status(400).json({
+        mensagem: "usuario_id é obrigatório.",
+      });
+    }
+
+    const [resultado] = await banco.execute(
+      `DELETE FROM itens
+       WHERE id = ? AND usuario_id = ?`,
+      [id, usuario_id],
+    );
+
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({
+        mensagem: "Item não encontrado.",
+      });
+    }
+
+    res.json({
+      mensagem: "Item excluído com sucesso.",
+    });
+  } catch (erro) {
+    console.error(erro);
+
+    res.status(500).json({
+      mensagem: "Erro ao excluir item.",
+    });
+  }
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`API rodando na porta ${PORT}`);
 });

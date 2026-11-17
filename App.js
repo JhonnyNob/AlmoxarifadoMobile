@@ -2,12 +2,16 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text } from "react-native";
+
 import Login from "./login";
 import Cadastro from "./cadastro";
 import Itens from "./itens";
 import Search from "./search";
 import Menu from "./menu";
 import Add from "./add";
+import Edit from "./edit";
+import Saida from "./saida";
+
 import colors from "./src/style/colors";
 
 const Stack = createStackNavigator();
@@ -36,16 +40,8 @@ function NavegacaoPrincipal({ route }) {
         component={Itens}
         initialParams={{ usuarioId }}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text
-              style={{
-                color,
-                fontSize: size,
-              }}
-            >
-              ▣
-            </Text>
-          ),
+          tabBarLabel: "Item",
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>▣</Text>,
         }}
       />
 
@@ -54,16 +50,8 @@ function NavegacaoPrincipal({ route }) {
         component={Search}
         initialParams={{ usuarioId }}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text
-              style={{
-                color,
-                fontSize: size,
-              }}
-            >
-              ⌕
-            </Text>
-          ),
+          tabBarLabel: "Search",
+          tabBarIcon: () => <Text style={{ fontSize: 25 }}>⌕</Text>,
         }}
       />
 
@@ -72,16 +60,8 @@ function NavegacaoPrincipal({ route }) {
         component={Menu}
         initialParams={{ usuarioId }}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Text
-              style={{
-                color,
-                fontSize: size,
-              }}
-            >
-              ☰
-            </Text>
-          ),
+          tabBarLabel: "Menu",
+          tabBarIcon: () => <Text style={{ fontSize: 22 }}>☰</Text>,
         }}
       />
     </Tab.Navigator>
@@ -91,18 +71,13 @@ function NavegacaoPrincipal({ route }) {
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={Login} />
-
         <Stack.Screen name="Cadastro" component={Cadastro} />
-
         <Stack.Screen name="Principal" component={NavegacaoPrincipal} />
-
         <Stack.Screen name="Add" component={Add} />
+        <Stack.Screen name="Edit" component={Edit} />
+        <Stack.Screen name="Saida" component={Saida} />
       </Stack.Navigator>
     </NavigationContainer>
   );

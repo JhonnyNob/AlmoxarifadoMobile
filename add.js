@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   View,
   Text,
@@ -5,40 +6,40 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
-  ActivityIndicator,
 } from "react-native";
-import colors from "./src/style/colors";
-import { useState } from "react";
 
-const API_URL = "http://10.66.157.181:3000";
+const API_URL = "http://10.234.156.181:3000";
 
 export default function Add({ navigation, route }) {
+  const usuarioId = route.params?.usuarioId;
+
   const [nome, setNome] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [carregando, setCarregando] = useState(false);
 
-  const usuarioId = route.params?.usuarioId;
-
-  async function cadastrarItem() {
+  async function adicionarItem() {
     const nomeLimpo = nome.trim();
+    const quantidadeNumerica = Number(quantidade);
+
+    if (!nomeLimpo) {
+      Alert.alert("Atenção", "Digite o nome do item.");
+      return;
+    }
+
+    if (
+      quantidade === "" ||
+      !Number.isInteger(quantidadeNumerica) ||
+      quantidadeNumerica < 0
+    ) {
+      Alert.alert(
+        "Atenção",
+        "Digite uma quantidade inteira maior ou igual a zero.",
+      );
+      return;
+    }
 
     if (!usuarioId) {
-      Alert.alert("Erro", "Não foi possível identificar o usuário.");
-      return;
-    }
-
-    if (!nomeLimpo || quantidade.trim() === "") {
-      Alert.alert("Atenção", "Preencha o nome e a quantidade.");
-      return;
-    }
-
-    const quantidadeNumero = Number(quantidade);
-
-    if (!Number.isSafeInteger(quantidadeNumero) || quantidadeNumero < 0) {
-      Alert.alert(
-        "Quantidade inválida",
-        "Informe um número inteiro igual ou maior que zero.",
-      );
+      Alert.alert("Erro", "Usuário não identificado.");
       return;
     }
 
@@ -53,144 +54,130 @@ export default function Add({ navigation, route }) {
         body: JSON.stringify({
           usuario_id: usuarioId,
           nome: nomeLimpo,
-          quantidade: quantidadeNumero,
+          quantidade: quantidadeNumerica,
         }),
       });
 
       const dados = await resposta.json();
 
       if (!resposta.ok) {
-        throw new Error(dados.mensagem || "Não foi possível cadastrar o item.");
+        throw new Error(dados.mensagem || "Erro ao adicionar item.");
       }
 
-      Alert.alert("Sucesso", dados.mensagem, [
+      Alert.alert("Sucesso", "Item adicionado com sucesso.", [
         {
           text: "OK",
           onPress: () => navigation.goBack(),
         },
       ]);
-
-      setNome("");
-      setQuantidade("");
     } catch (erro) {
-      console.error("Erro ao cadastrar item:", erro);
-
-      Alert.alert(
-        "Erro",
-        erro.message === "Network request failed"
-          ? "Não foi possível conectar à API."
-          : erro.message || "Ocorreu um erro ao cadastrar o item.",
-      );
+      Alert.alert("Erro", erro.message);
     } finally {
       setCarregando(false);
     }
   }
 
   return (
-    <View style={estilo.tela}>
-      <Text style={estilo.titulo}>Adicionar item</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Adicionar item</Text>
 
-      <Text style={estilo.rotulo}>Nome do item</Text>
+      <Text style={styles.label}>Nome do item</Text>
 
       <TextInput
-        style={estilo.campo}
-        placeholder="Nome do item"
-        placeholderTextColor="#888888"
+        style={styles.input}
         value={nome}
         onChangeText={setNome}
-        editable={!carregando}
+        placeholder="Digite o nome"
+        placeholderTextColor="#94a3b8"
       />
 
-      <Text style={estilo.rotulo}>Quantidade</Text>
+      <Text style={styles.label}>Quantidade</Text>
 
       <TextInput
-        style={estilo.campo}
-        placeholder="Quantidade"
-        placeholderTextColor="#888888"
+        style={styles.input}
         value={quantidade}
         onChangeText={setQuantidade}
+        placeholder="Digite a quantidade"
+        placeholderTextColor="#94a3b8"
         keyboardType="numeric"
-        editable={!carregando}
       />
 
-      <View style={estilo.botoes}>
+      <View style={styles.buttons}>
         <TouchableOpacity
-          style={estilo.botaoCancelar}
+          style={styles.cancelar}
           onPress={() => navigation.goBack()}
           disabled={carregando}
         >
-          <Text style={estilo.textoBotao}>Cancelar</Text>
+          <Text style={styles.cancelarText}>Cancelar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={estilo.botao}
-          onPress={cadastrarItem}
+          style={styles.adicionar}
+          onPress={adicionarItem}
           disabled={carregando}
         >
-          {carregando ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={estilo.textoBotao}>Adicionar</Text>
-          )}
+          <Text style={styles.adicionarText}>
+            {carregando ? "Adicionando..." : "Adicionar"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const estilo = StyleSheet.create({
-  tela: {
+const styles = StyleSheet.create({
+  container: {
     flex: 1,
-    backgroundColor: colors.background,
-    padding: 20,
+    backgroundColor: "#0f172a",
+    padding: 24,
   },
-
-  titulo: {
-    color: colors.text,
-    fontSize: 26,
+  title: {
+    color: "#ffffff",
+    fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 25,
+    marginBottom: 30,
   },
-
-  rotulo: {
-    color: colors.text,
+  label: {
+    color: "#ffffff",
     fontSize: 16,
     marginBottom: 8,
-    marginTop: 12,
   },
-
-  campo: {
-    backgroundColor: colors.cardBackground,
-    color: colors.text,
-    borderRadius: 10,
-    padding: 14,
+  input: {
+    backgroundColor: "#334155",
+    color: "#ffffff",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     fontSize: 16,
+    marginBottom: 20,
   },
-
-  botoes: {
+  buttons: {
     flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 25,
+    gap: 12,
+    marginTop: 10,
   },
-
-  botaoCancelar: {
-    backgroundColor: colors.cardBackground,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: "center",
-    marginRight: 10,
-  },
-
-  botao: {
-    backgroundColor: colors.secondary,
-    padding: 16,
-    borderRadius: 10,
+  cancelar: {
+    flex: 1,
+    backgroundColor: "#334155",
+    paddingVertical: 14,
+    borderRadius: 8,
     alignItems: "center",
   },
-
-  textoBotao: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
+  cancelarText: {
+    color: "#ffffff",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  adicionar: {
+    flex: 1,
+    backgroundColor: "#2563eb",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  adicionarText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

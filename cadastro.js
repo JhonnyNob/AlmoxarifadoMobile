@@ -12,7 +12,7 @@ import { useState } from "react";
 import colors from "./src/style/colors";
 import { StatusBar } from "expo-status-bar";
 
-const API_URL = "http://10.66.157.181:3000";
+const API_URL = "http://10.234.156.181:3000";
 
 export default function Cadastro({ navigation }) {
   const [nomeUsuario, setNomeUsuario] = useState("");

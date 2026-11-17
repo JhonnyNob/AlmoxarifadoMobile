@@ -9,20 +9,18 @@ import {
   Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import colors from "./src/style/colors";
-import { StatusBar } from "expo-status-bar";
 
-const API_URL = "http://10.66.157.181:3000";
+const API_URL = "http://10.234.156.181:3000";
 
 export default function Search({ route }) {
   const usuarioId = route.params?.usuarioId;
-  const [itens, setItens] = useState([]);
+
   const [pesquisa, setPesquisa] = useState("");
+  const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
-  const buscarItens = useCallback(async () => {
+  const carregarItens = useCallback(async () => {
     if (!usuarioId) {
-      Alert.alert("Erro", "Usuário não identificado.");
       setCarregando(false);
       return;
     }
@@ -35,17 +33,12 @@ export default function Search({ route }) {
       const dados = await resposta.json();
 
       if (!resposta.ok) {
-        throw new Error(
-          dados.mensagem || "Não foi possível carregar os itens.",
-        );
+        throw new Error(dados.mensagem || "Erro ao carregar itens.");
       }
 
       setItens(dados);
     } catch (erro) {
-      Alert.alert(
-        "Erro",
-        erro.message || "Não foi possível carregar os itens.",
-      );
+      Alert.alert("Erro", erro.message);
     } finally {
       setCarregando(false);
     }
@@ -53,145 +46,113 @@ export default function Search({ route }) {
 
   useFocusEffect(
     useCallback(() => {
-      buscarItens();
-    }, [buscarItens]),
+      carregarItens();
+    }, [carregarItens]),
   );
 
   const itensFiltrados = itens.filter((item) =>
     item.nome.toLowerCase().includes(pesquisa.trim().toLowerCase()),
   );
 
-  function renderItem({ item }) {
-    return (
-      <View style={estilo.item}>
-        <Text style={estilo.nomeItem}>{item.nome}</Text>
-
-        <Text style={estilo.quantidadeItem}>{item.quantidade} unidades</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={estilo.tela}>
-      <View style={estilo.cabecalho}>
-        <Text style={estilo.titulo}>Pesquisar</Text>
-      </View>
+    <View style={styles.container}>
+      <Text style={styles.titulo}>Pesquisar</Text>
 
       <TextInput
-        style={estilo.campoPesquisa}
-        placeholder="Pesquisar item..."
-        placeholderTextColor={colors.textSecondary}
+        style={styles.input}
         value={pesquisa}
         onChangeText={setPesquisa}
-        autoCapitalize="none"
-        autoCorrect={false}
+        placeholder="Pesquisar item"
+        placeholderTextColor="#94a3b8"
       />
 
       {carregando ? (
-        <View style={estilo.carregando}>
-          <ActivityIndicator size="large" color={colors.text} />
-
-          <Text style={estilo.textoCarregando}>Carregando itens...</Text>
+        <View style={styles.carregando}>
+          <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : (
         <FlatList
           data={itensFiltrados}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={
-            itensFiltrados.length === 0 ? estilo.listaVazia : estilo.lista
+            itensFiltrados.length === 0 ? styles.listaVazia : styles.lista
           }
-          renderItem={renderItem}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.informacoes}>
+                <Text style={styles.nome}>{item.nome}</Text>
+
+                <Text style={styles.quantidade}>
+                  Quantidade: {item.quantidade}
+                </Text>
+              </View>
+            </View>
+          )}
           ListEmptyComponent={
-            <Text style={estilo.nenhumItem}>
-              {pesquisa.trim()
-                ? "Nenhum item encontrado."
-                : "Nenhum item cadastrado."}
-            </Text>
+            <Text style={styles.vazio}>Nenhum item encontrado.</Text>
           }
         />
       )}
-
-      <StatusBar style="light" />
     </View>
   );
 }
 
-const estilo = StyleSheet.create({
-  tela: {
+const styles = StyleSheet.create({
+  container: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  cabecalho: {
+    backgroundColor: "#0f172a",
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingTop: 20,
   },
-
   titulo: {
-    color: colors.text,
-    fontSize: 26,
+    color: "#ffffff",
+    fontSize: 28,
     fontWeight: "bold",
+    marginBottom: 20,
   },
-
-  campoPesquisa: {
-    width: "90%",
-    alignSelf: "center",
-    backgroundColor: colors.cardBackground,
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 10,
-    color: colors.text,
-    fontSize: 15,
+  input: {
+    backgroundColor: "#334155",
+    color: "#ffffff",
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    fontSize: 16,
+    marginBottom: 15,
   },
-
   lista: {
     paddingBottom: 20,
   },
-
   listaVazia: {
     flexGrow: 1,
     justifyContent: "center",
-    alignItems: "center",
   },
-
-  item: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: colors.cardBackground,
-    marginHorizontal: 15,
-    marginVertical: 5,
-    padding: 15,
+  card: {
+    backgroundColor: "#1e293b",
     borderRadius: 10,
+    padding: 16,
+    marginBottom: 12,
   },
-
-  nomeItem: {
-    color: colors.text,
-    fontSize: 16,
+  informacoes: {
+    flex: 1,
+  },
+  nome: {
+    color: "#ffffff",
+    fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 5,
   },
-
-  quantidadeItem: {
-    color: colors.text,
-    fontSize: 14,
+  quantidade: {
+    color: "#94a3b8",
+    fontSize: 15,
   },
-
+  vazio: {
+    color: "#94a3b8",
+    fontSize: 16,
+    textAlign: "center",
+  },
   carregando: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-
-  textoCarregando: {
-    color: colors.text,
-    fontSize: 15,
-    marginTop: 10,
-  },
-
-  nenhumItem: {
-    color: colors.text,
-    textAlign: "center",
-    marginTop: 30,
-    fontSize: 16,
   },
 });
